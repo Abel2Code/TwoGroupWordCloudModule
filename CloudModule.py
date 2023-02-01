@@ -1,11 +1,37 @@
 from wordcloud import (WordCloud, get_single_color_func)
 import matplotlib.pyplot as plt
 from collections import Counter, defaultdict
+import sys
+import re
 
 DEFAULT_THRESHOLDS = [0.2, 0.4, 0.6, 0.8, 1]
 DEFAULT_COLORS = ["#ff0000", "#ffa6a6", "grey", "#a6c5ff", "#0059ff"]
 
 PUNCTUATION = '.,?!'
+
+"""
+Preprocess text, removing unwanted symbols and converting into lower case. 
+
+Required Parameters
+
+text: str
+ Text for preprocessing.
+ 
+Warning: The internal word cloud algorithm runs similar code when generating the word cloud. Removing any preprocessing in this set may break the weighting mechanism and will not have an effect on the final word cloud generated.
+"""
+def preprocess_text(text):
+    flags = (re.UNICODE if sys.version < '3' and type(text) is unicode  # noqa: F821
+         else 0)
+    pattern = r"\w[\w']*"
+    regexp = pattern
+
+    words = re.findall(regexp, text, flags)
+    # remove 's
+    words = [word[:-2] if word.lower().endswith("'s") else word
+             for word in words]
+    # remove numbers
+    words = [word for word in words if not word.isdigit()]
+    return ' '.join(words).lower()
 
 """
 Generate a word cloud comparing word frequencies between two groups.
@@ -65,11 +91,8 @@ def generateTwoGroupWordCloud(group_1_text, group_2_text, thresholds=DEFAULT_THR
     if len(thresholds) != len(colors):
         raise Exception("Thresholds list must be same length as colors. (Each threshold corresponds to a color.)")
         
-    if any(p in group for group in [group_1_text, group_2_text] for p in PUNCTUATION):
-        print("Warning: Text has punctuation. Consider removing punctuation for better results.")
-        
-    if not group_1_text.islower() and group_2_text.islower():
-        print("Warning: Text is not lowercase. Consider preprocessing with .lower() for improved results.")
+    group_1_text = preprocess_text(group_1_text)
+    group_2_text = preprocess_text(group_2_text)
     
     # Compute Frequencies
     group_1_words = group_1_text.split(' ')
@@ -95,7 +118,7 @@ def generateTwoGroupWordCloud(group_1_text, group_2_text, thresholds=DEFAULT_THR
         
     # Generate Word Cloud
     combined_text = group_1_text + ' ' + group_2_text
-    wc = WordCloud(height=wc_height, width=wc_width, background_color=wc_background_color).generate(combined_text)
+    wc = WordCloud(height=wc_height, width=wc_width, background_color=wc_background_color, collocations=False).generate(combined_text)
     wc.recolor(color_func=__create_choose_color_func__(word_scores, thresholds, colors))
     
     return wc
@@ -103,6 +126,7 @@ def generateTwoGroupWordCloud(group_1_text, group_2_text, thresholds=DEFAULT_THR
 def __create_choose_color_func__(word_scores, thresholds, colors):
     def __choose_color__(word, **kwargs):
         if word not in word_scores:
+            print(word)
             raise Exception(f"No score created for {word}")
 
         score = word_scores[word]
